@@ -3,4 +3,5 @@
 *.db-shm
 *.db-wal
 *.sqlite
-ds/
+ds/*
+!ds/datasette.yaml
