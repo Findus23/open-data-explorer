@@ -1,0 +1,26 @@
+[project]
+name = "open-data-explorer"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Lukas Winkler",email = "git@lw1.at"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests (>=2.32.3,<3.0.0)",
+    "datasette (==1.0a17)",
+    "starlette (>=0.46.1,<0.47.0)",
+    "sqlite-utils (>=3.38,<4.0)",
+    "requests-cache (>=1.2.1,<2.0.0)",
+    "pydantic (>=2.11.2,<3.0.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+
