@@ -8,9 +8,12 @@ from sqlite_utils.utils import file_progress, TypeTracker
 from .datagv import get_metadata
 from .globals import s
 from .meta_db import Record, Resource, meta_db
+from .progress_logger import RecordLogger
 
 
 def fetch_dataset(id: str):
+    logger = RecordLogger(id)
+    logger.set_status("fetching dataset")
     datagv_meta = get_metadata(id)
     db = Database(f"ds/{id}.db", recreate=True)
     db.enable_wal()
@@ -36,9 +39,10 @@ def fetch_dataset(id: str):
         tags=[p["display_name"] for p in datagv_meta["tags"]],
         api_data=datagv_meta,
     )
-    meta_db.upsert_record(id, meta_obj)
+    num_res = len(datagv_meta["resources"])
+    for i, res in enumerate(datagv_meta["resources"]):
+        logger.set_status(f"fetching resource {i}/{num_res}")
 
-    for res in datagv_meta["resources"]:
         format = res["format"]
         name = res["name"]
         if format != "CSV":
@@ -49,6 +53,7 @@ def fetch_dataset(id: str):
 
         r = s.get(url)
         r.raise_for_status()
+        logger.set_status(f"importing resource {i}/{num_res}")
         with tempfile.TemporaryFile("w+") as f:
             encoding = "utf-8"
             f.write(r.content.decode(encoding, "ignore"))
@@ -98,6 +103,14 @@ def fetch_dataset(id: str):
         meta_db.upsert_resource(res["id"], meta_res)
 
     # db.index_foreign_keys()
+    logger.set_status("optimizing database")
 
     db.analyze()
     db.vacuum()
+    # https://til.simonwillison.net/sqlite/database-file-size
+    curr = db.execute("select page_size * page_count from pragma_page_count(), pragma_page_size()")
+    db_size = curr.fetchone()[0]
+    meta_obj.db_size = db_size
+    meta_db.upsert_record(id, meta_obj)
+    db.close()
+    logger.set_status("done")

@@ -28,6 +28,8 @@ class Record(BaseModel):
     tags: list[str]
     api_data: dict
 
+    db_size: Optional[int] = None
+
     @property
     def datagvurl(self):
         return "https://www.data.gv.at/katalog/dataset/" + self.id
@@ -50,6 +52,8 @@ class MetaDatabase:
         self.conn: Connection = db.conn
         self.records = self.db["records"]
         self.resources = self.db["resources"]
+        self.status = self.db["status"]
+        self.db.enable_wal()
 
     def upsert_record(self, id: str, data: Record):
         assert id == data.id

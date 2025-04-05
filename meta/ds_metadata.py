@@ -91,7 +91,11 @@ def create_ds_metadata():
                 db_meta = merge_models(db_meta, metadata_from_file)
         metadata.databases[record.id] = db_meta
 
-    print(metadata)
+    with (metadata_dir / "meta.yaml").open() as f:
+        data = yaml.safe_load(f)
+        metadata_from_file = DatabaseMeta(**data)
+        metadata.databases["meta"] = metadata_from_file
+
 
     with metadata_output_file.open("w") as f:
         yaml.dump(metadata.model_dump(exclude_none=True), f, sort_keys=False)
