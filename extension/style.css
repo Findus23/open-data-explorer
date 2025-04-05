@@ -1,0 +1,14 @@
+.nav-tabs a#explorer-link-injected {
+    background-color: #ffc107;
+    border-radius: 0 16px 0 0;
+    display: block;
+    font-size: 1.1rem;
+    padding: .5rem 1rem;
+    margin-bottom: unset;
+    color: #212529;
+}
+
+.nav-tabs a#explorer-link-injected:hover, .nav-tabs a#explorer-link-injected:focus {
+    background-color: #fff2c9;
+    text-decoration: none;
+}
