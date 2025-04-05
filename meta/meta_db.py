@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseModel
 from sqlite_utils import Database
 
+from .globals import root_dir
 from .utils import Url
 
 
@@ -34,7 +35,7 @@ class Record(BaseModel):
 
 class Resource(BaseModel):
     id: str
-    record: Record|str
+    record: Record | str
     format: str
     name: str
     url: Url
@@ -71,3 +72,7 @@ class MetaDatabase:
 
     def get_records(self) -> list[Record]:
         return [self.self_rec_row_to_record(row) for row in self.records.rows]
+
+
+# have just one singleton object
+meta_db = MetaDatabase(Database(root_dir / "ds/meta.db"))

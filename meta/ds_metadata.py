@@ -1,15 +1,14 @@
 import json
-from pathlib import Path
 from typing import Optional
 
 import yaml
 from pydantic import BaseModel
 
-from .meta_db import MetaDatabase
+from .globals import root_dir
+from .meta_db import meta_db
 from .utils import Url, merge_models
 
-root_dir = Path(__file__).parent.parent
-metadata_dir = Path(__file__).parent.parent / "metadata"
+metadata_dir = root_dir / "metadata"
 schema_file = metadata_dir / "schema.json"
 metadata_output_file = root_dir / "ds" / "metadata.yaml"
 
@@ -58,11 +57,11 @@ def create_schema_file():
         json.dump(DatabaseMeta.model_json_schema(), f, indent=2, ensure_ascii=False)
 
 
-def create_ds_metadata(db: MetaDatabase):
+def create_ds_metadata():
     create_schema_file()
     metadata = MetaData()
 
-    for record in db.get_records():
+    for record in meta_db.get_records():
         db_meta = DatabaseMeta(
             source=record.publisher,
             source_url=record.datagvurl,
@@ -71,7 +70,7 @@ def create_ds_metadata(db: MetaDatabase):
             about=record.maintainer,
             about_url=record.metadata_linkage,
         )
-        for resource in db.get_resources(record):
+        for resource in meta_db.get_resources(record):
             res_meta = TableMeta(
                 source=record.publisher,
                 source_url=record.datagvurl,
