@@ -1,10 +1,11 @@
+import os
+import socket
 from typing import Annotated, TypeVar
 
 from pydantic import BeforeValidator, HttpUrl, TypeAdapter, BaseModel
 
 http_url_adapter = TypeAdapter(HttpUrl)
 Url = Annotated[str, BeforeValidator(lambda value: str(http_url_adapter.validate_python(value)))]
-
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -43,3 +44,20 @@ def merge_models(base: T, override: T) -> T:
         else:
             merged_data[field] = base_val
     return base.__class__(**merged_data)
+
+
+def sd_notify(message: str):
+    notify_socket = os.getenv("NOTIFY_SOCKET")
+    if not notify_socket:
+        return  # Not running under systemd
+
+    # Abstract namespace socket if starts with "@"
+    if notify_socket[0] == "@":
+        notify_socket = "\0" + notify_socket[1:]
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        sock.connect(notify_socket)
+        sock.sendall(message.encode())
+    finally:
+        sock.close()

@@ -32,7 +32,7 @@ def fetch_dataset(id: str):
         maintainer=datagv_meta["maintainer"],
         metadata_created=datagv_meta["metadata_created"],
         metadata_modified=datagv_meta["metadata_modified"],
-        metadata_linkage=datagv_meta["metadata_linkage"],
+        metadata_linkage=datagv_meta["metadata_linkage"] if "metadata_linkage" in datagv_meta else None,
 
         attribute_description=datagv_meta["attribute_description"],
         geographic_toponym=datagv_meta["geographic_toponym"],

@@ -20,7 +20,7 @@ class Record(BaseModel):
     license_title: str
     license_url: Url
     maintainer: str
-    metadata_linkage: Url
+    metadata_linkage: Optional[Url]
     metadata_created: str
     metadata_modified: str
     attribute_description: str
@@ -68,6 +68,19 @@ class MetaDatabase:
 
     def get_resources(self, record: Record) -> list[Resource]:
         return [Resource(**row) for row in self.db.query("SELECT * FROM resources where record= ?", [record.id])]
+
+    def get_resource(self, id) -> Optional[Resource]:
+        try:
+            row = list(self.db.query("SELECT * FROM resources where id= ?", [id]))[0]
+        except IndexError:
+            return None
+        return Resource(**row)
+    def get_record(self, id) -> Optional[Record]:
+        try:
+            row = list(self.db.query("SELECT * FROM records where id= ?", [id]))[0]
+        except IndexError:
+            return None
+        return self.self_rec_row_to_record(row)
 
     def self_rec_row_to_record(self, row: dict) -> Record:
         row["tags"] = json.loads(row["tags"])
