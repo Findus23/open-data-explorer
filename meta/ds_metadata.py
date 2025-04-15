@@ -6,11 +6,12 @@ from pydantic import BaseModel
 
 from .globals import root_dir
 from .meta_db import meta_db
-from .utils import Url, merge_models
+from .utils import merge_models, Url
 
 metadata_dir = root_dir / "metadata"
 schema_file = metadata_dir / "schema.json"
 metadata_output_file = root_dir / "ds" / "metadata.yaml"
+
 
 
 class TableMeta(BaseModel):
@@ -91,11 +92,10 @@ def create_ds_metadata():
                 db_meta = merge_models(db_meta, metadata_from_file)
         metadata.databases[record.id] = db_meta
 
-    with (metadata_dir / "meta.yaml").open() as f:
+    with (metadata_dir / "meta_db.yaml").open() as f:
         data = yaml.safe_load(f)
         metadata_from_file = DatabaseMeta(**data)
-        metadata.databases["meta"] = metadata_from_file
-
+        metadata.databases["meta_db"] = metadata_from_file
 
     with metadata_output_file.open("w") as f:
         yaml.dump(metadata.model_dump(exclude_none=True), f, sort_keys=False)

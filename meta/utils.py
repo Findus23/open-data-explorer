@@ -1,11 +1,12 @@
 import os
 import socket
-from typing import Annotated, TypeVar
+from typing import TypeVar
 
-from pydantic import BeforeValidator, HttpUrl, TypeAdapter, BaseModel
+from pydantic import HttpUrl, TypeAdapter, BaseModel
 
 http_url_adapter = TypeAdapter(HttpUrl)
-Url = Annotated[str, BeforeValidator(lambda value: str(http_url_adapter.validate_python(value)))]
+# Url = Annotated[str, BeforeValidator(lambda value: str(http_url_adapter.validate_python(value)))]
+Url = str
 
 T = TypeVar('T', bound=BaseModel)
 

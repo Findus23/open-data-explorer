@@ -1,11 +1,11 @@
 import time
 
 from meta import fetch_dataset
+from meta.meta_db import meta_sqlite_conn
 from meta.utils import sd_notify
 from very_simple_task_queue import Queue
-from .globals import root_dir
 
-q = Queue(root_dir / "ds" / "queue.db")
+q = Queue(meta_sqlite_conn)
 
 
 def add_fetch_task(id: str):

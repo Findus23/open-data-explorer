@@ -34,8 +34,8 @@ class JobStatus(IntEnum):
 
 
 class Queue:
-    def __init__(self, filename: Path):
-        self.conn = sqlite3.connect(filename, autocommit=True)
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
         self.init_tables()
 
     def init_tables(self):

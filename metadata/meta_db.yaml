@@ -1,0 +1,6 @@
+about: This is the database used by this website
+tables:
+  logging:
+    sort_desc: timestamp
+  queue:
+    sort_desc: in_time

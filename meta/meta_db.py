@@ -75,6 +75,7 @@ class MetaDatabase:
         except IndexError:
             return None
         return Resource(**row)
+
     def get_record(self, id) -> Optional[Record]:
         try:
             row = list(self.db.query("SELECT * FROM records where id= ?", [id]))[0]
@@ -91,5 +92,7 @@ class MetaDatabase:
         return [self.self_rec_row_to_record(row) for row in self.records.rows]
 
 
+meta_sqlite_conn = Connection(root_dir / "ds/meta_db.db")
+
 # have just one singleton object
-meta_db = MetaDatabase(Database(root_dir / "ds/meta.db"))
+meta_db = MetaDatabase(Database(meta_sqlite_conn))
