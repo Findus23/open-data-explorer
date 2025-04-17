@@ -9,13 +9,17 @@ from meta.tasks import add_fetch_task, q
 
 templates = Jinja2Templates(directory='templates')
 
+async def home(request):
+    return templates.TemplateResponse(request,'index.html')
 
 async def show(request):
     id = request.path_params['id']
     resource = meta_db.get_record(id=id)
 
     if resource is None:
-        return RedirectResponse(request.url_for('fetch_start', id=id))
+        return templates.TemplateResponse(request, 'confirm_fetch.html', context={'id': id})
+
+    # return RedirectResponse(request.url_for('fetch_start', id=id))
 
     # status = RecordLogger.get_latest_status_by_id(id)
     return RedirectResponse(f"/{id}/")
@@ -24,13 +28,15 @@ async def show(request):
 
 async def fetch(request):
     id = request.path_params['id']
+    # TODO: add a check to only fetch if the
     task_id = add_fetch_task(id)
-    return RedirectResponse(request.url_for("task_page", task_id=task_id))
+    # need 303 to make POST a GET request
+    return RedirectResponse(request.url_for("task_page", task_id=task_id), status_code=303)
 
 
 async def task_page(request):
     task_id = request.path_params['task_id']
-    return templates.TemplateResponse(request, 'index.html', context={'task_id': task_id})
+    return templates.TemplateResponse(request, 'fetch.html', context={'task_id': task_id})
 
 
 async def task_status(request):
@@ -41,12 +47,14 @@ async def task_status(request):
         redirect_url = request.url_for("show", id=task_data["properties"]["id"]).path
     else:
         redirect_url = None
-    return JSONResponse({'status': status, "task_status": task_status, "task_data": task_data,"redirect_url":redirect_url})
+    return JSONResponse(
+        {'status': status, "task_status": task_status, "task_data": task_data, "redirect_url": redirect_url})
 
 
 app = Starlette(debug=True, routes=[
+    Route('/', home, name='home'),
     Route('/meta/{id}', show, name='show'),
-    Route('/meta/{id}/fetch', fetch, name='fetch_start'),
+    Route('/meta/{id}/fetch', fetch, name='fetch_start', methods=["POST"]),
     Route('/meta/task/{task_id}', task_page, name='task_page'),
     Route('/meta/task/{task_id}/status', task_status, name='task_status'),
 ])

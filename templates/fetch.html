@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="/-/static/app.css?449502">
+</head>
+<body>
+
+
+<h1>Fetching {{ id }}</h1>
+
+<p id="message"></p>
+
+<script>
+    let task_id = '{{ task_id }}';
+    const apiUrl = '/meta/task/' + task_id + "/status"; // Replace with your actual API URL
+    const messageBox = document.getElementById('message');
+
+    async function fetchMessage() {
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            messageBox.textContent = data.status;
+
+            if (data.task_status == 2) {
+                const redirect_url = data.redirect_url
+                window.location.replace(redirect_url)
+            }
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            messageBox.textContent = 'Error fetching message';
+        }
+    }
+
+    // Call once immediately, then every 1 second
+    fetchMessage();
+    setInterval(fetchMessage, 1000);
+</script>
+
+
+</body>
+</html>
