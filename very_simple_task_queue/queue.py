@@ -16,8 +16,6 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import UUID4
-
 
 @dataclass(frozen=True)
 class Job:
@@ -40,13 +38,14 @@ class Queue:
 
     def init_tables(self):
         self.conn.execute("""
-        CREATE TABLE IF NOT EXISTS queue (
-            job_id BLOB PRIMARY KEY,
-            status INTEGER NOT NULL,
-            data JSON NOT NULL,
-            in_time INTEGER NOT NULL,
-            lock_time INTEGER
-        ) WITHOUT ROWID """)
+                          CREATE TABLE IF NOT EXISTS queue
+                          (
+                              job_id    BLOB PRIMARY KEY,
+                              status    INTEGER NOT NULL,
+                              data      JSON    NOT NULL,
+                              in_time   INTEGER NOT NULL,
+                              lock_time INTEGER
+                          ) WITHOUT ROWID """)
 
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS queue_idx ON queue (job_id)")
 
@@ -55,14 +54,15 @@ class Queue:
         self.conn.execute("PRAGMA temp_store = MEMORY;")
         self.conn.execute("PRAGMA synchronous = NORMAL;")
 
-    def put(self, data) -> None:
+    def put(self, data) -> str:
         job_id = uuid.uuid4()
         now = datetime.now().timestamp()
         with self.conn:
             self.conn.execute(
                 """INSERT INTO queue (data, job_id, status, in_time)
-    VALUES (:data, :job_id, :status, :now)""",
+                   VALUES (:data, :job_id, :status, :now)""",
                 {"data": json.dumps(data), "job_id": job_id.hex, "status": 0, "now": now})
+        return job_id.hex
 
     def get_next_job(self) -> Optional[Job]:
         now = datetime.now().timestamp()
@@ -75,9 +75,15 @@ class Queue:
         job_id, status, data, in_time = resp
         return Job(job_id, status, json.loads(data), in_time)
 
-    def set_job_done(self,job: Job) -> None:
+    def set_job_done(self, job: Job) -> None:
         with self.conn:
             self.conn.execute("UPDATE queue SET status=2 WHERE job_id= :job_id", {"job_id": job.id})
+
+    def get_job_status(self, job_id: str) -> tuple[int, dict]:
+        status, data = self.conn.execute("SELECT status, data FROM queue WHERE job_id= :job_id",
+                                         {"job_id": job_id}).fetchone()
+        return status, json.loads(data)
+
 
 if __name__ == '__main__':
     queue = Queue(Path('queue'))

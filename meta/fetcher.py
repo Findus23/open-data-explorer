@@ -11,8 +11,8 @@ from .meta_db import Record, Resource, meta_db
 from .progress_logger import RecordLogger
 
 
-def fetch_dataset(id: str):
-    logger = RecordLogger(id)
+def fetch_dataset(id: str, task_id: str):
+    logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
     datagv_meta = get_metadata(id)
     db = Database(f"ds/{id}.db", recreate=True)
