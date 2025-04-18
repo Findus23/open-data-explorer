@@ -84,6 +84,7 @@ def create_ds_metadata():
             about=record.maintainer,
             about_url=record.metadata_linkage,
             title=record.title,
+            description=record.notes,  # add more in the future
         )
         for resource in meta_db.get_resources(record):
             res_meta = TableMeta(

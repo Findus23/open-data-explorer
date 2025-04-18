@@ -29,7 +29,7 @@ class Record(BaseModel):
     api_data: dict
 
     db_size: Optional[int] = None
-    num_queries: Optional[int] = None
+    num_queries: Optional[int] = 0
 
     @property
     def datagvurl(self):
@@ -59,7 +59,7 @@ class MetaDatabase:
     def upsert_record(self, id: str, data: Record):
         assert id == data.id
         as_dict = Record.model_dump(data)
-        return self.records.upsert(as_dict, pk="id")
+        return self.records.upsert(as_dict, pk="id", defaults={"num_queries": 0})
 
     def upsert_resource(self, id, data: Resource):
         assert id == data.id
@@ -91,7 +91,6 @@ class MetaDatabase:
 
     def get_records(self) -> list[Record]:
         return [self.self_rec_row_to_record(row) for row in self.records.rows]
-
 
 
 meta_sqlite_conn = Connection(root_dir / "ds/meta_db.db")

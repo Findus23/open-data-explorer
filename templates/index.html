@@ -11,7 +11,7 @@
 
 {% for rec in records %}
     <div>
-        <h2>{{ rec.title }}</h2>
+        <h2><a href="/{{ rec.id }}">{{ rec.title }}</a> ({{ rec.num_queries }})</h2>
     </div>
 {% endfor %}
 
