@@ -2,5 +2,17 @@ about: This is the database used by this website
 tables:
   logging:
     sort_desc: timestamp
+
   queue:
     sort_desc: in_time
+    about: "test"
+    columns:
+      status: "0: in queue; 1: working; 2: finished"
+  records:
+    description: "Alle importierten data.gv.at Einträge"
+  resources:
+    description: "Importierte Dateien und ihre dazugehörigen Metadaten"
+queries:
+  most_popular:
+    sql: "select num_queries, id, title from records order by num_queries desc limit 101"
+    title: "Most queried records"

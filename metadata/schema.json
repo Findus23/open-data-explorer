@@ -1,5 +1,45 @@
 {
   "$defs": {
+    "CannedQuery": {
+      "properties": {
+        "sql": {
+          "title": "Sql",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parameters"
+        }
+      },
+      "required": [
+        "sql"
+      ],
+      "title": "CannedQuery",
+      "type": "object"
+    },
     "TableMeta": {
       "properties": {
         "source": {
@@ -73,6 +113,18 @@
           ],
           "default": null,
           "title": "About Url"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
         },
         "hidden": {
           "anyOf": [
@@ -257,6 +309,30 @@
       "default": null,
       "title": "About Url"
     },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
     "tables": {
       "additionalProperties": {
         "$ref": "#/$defs/TableMeta"
@@ -264,6 +340,21 @@
       "default": {},
       "title": "Tables",
       "type": "object"
+    },
+    "queries": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/CannedQuery"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Queries"
     }
   },
   "title": "DatabaseMeta",

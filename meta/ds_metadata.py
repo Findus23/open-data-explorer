@@ -11,7 +11,13 @@ from .utils import merge_models, Url
 metadata_dir = root_dir / "metadata"
 schema_file = metadata_dir / "schema.json"
 metadata_output_file = root_dir / "ds" / "metadata.yaml"
+datasette_conf_output_file = root_dir / "ds" / "datasette.yaml"
 
+
+class CannedQuery(BaseModel):
+    sql: str
+    title: Optional[str] = None
+    parameters: Optional[list[str]] = None
 
 
 class TableMeta(BaseModel):
@@ -21,6 +27,7 @@ class TableMeta(BaseModel):
     license_url: Optional[Url] = None
     about: Optional[str] = None
     about_url: Optional[Url] = None
+    description: Optional[str] = None  # undocumented
     hidden: Optional[bool] = None
     sort: Optional[str] = None
     sort_desc: Optional[str] = None
@@ -38,7 +45,10 @@ class DatabaseMeta(BaseModel):
     license_url: Optional[Url] = None
     about: Optional[str] = None
     about_url: Optional[Url] = None
+    title: Optional[str] = None  # undocumented
+    description: Optional[str] = None  # undocumented
     tables: dict[str, TableMeta] = {}
+    queries: Optional[dict[str, CannedQuery]] = None
 
 
 class MetaData(BaseModel):
@@ -61,6 +71,9 @@ def create_schema_file():
 def create_ds_metadata():
     create_schema_file()
     metadata = MetaData()
+    with (metadata_dir / "datasette.yaml").open() as f:
+        datasette_conf = yaml.safe_load(f)
+        datasette_conf["databases"] = {}
 
     for record in meta_db.get_records():
         db_meta = DatabaseMeta(
@@ -70,6 +83,7 @@ def create_ds_metadata():
             license_url=record.license_url,
             about=record.maintainer,
             about_url=record.metadata_linkage,
+            title=record.title,
         )
         for resource in meta_db.get_resources(record):
             res_meta = TableMeta(
@@ -97,5 +111,18 @@ def create_ds_metadata():
         metadata_from_file = DatabaseMeta(**data)
         metadata.databases["meta_db"] = metadata_from_file
 
+    for db_id, db_meta in metadata.databases.items():
+        if db_meta.queries is not None:
+            datasette_conf["databases"][db_id] = {
+                "queries": {k: v.model_dump(exclude_none=True) for k, v in db_meta.queries.items()}
+            }
+            metadata.databases[db_id].queries = None
+
     with metadata_output_file.open("w") as f:
         yaml.dump(metadata.model_dump(exclude_none=True), f, sort_keys=False)
+    with datasette_conf_output_file.open("w") as f:
+        yaml.dump(datasette_conf, f, sort_keys=False)
+
+
+if __name__ == '__main__':
+    create_ds_metadata()
