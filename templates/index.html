@@ -9,7 +9,11 @@
 
 <h1>Home</h1>
 
-
+{% for rec in records %}
+    <div>
+        <h2>{{ rec.title }}</h2>
+    </div>
+{% endfor %}
 
 
 </body>

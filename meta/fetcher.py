@@ -60,7 +60,7 @@ def fetch_dataset(id: str, task_id: str):
             print(f.tell())
 
             f.seek(0)
-            start = f.read(2048)  # .decode(encoding, "ignore")
+            start = f.read(4048)  # .decode(encoding, "ignore")
             print(start)
             dialect = csv.Sniffer().sniff(start)
             has_header = csv.Sniffer().has_header(start)

@@ -29,6 +29,7 @@ class Record(BaseModel):
     api_data: dict
 
     db_size: Optional[int] = None
+    num_queries: Optional[int] = None
 
     @property
     def datagvurl(self):
@@ -90,6 +91,7 @@ class MetaDatabase:
 
     def get_records(self) -> list[Record]:
         return [self.self_rec_row_to_record(row) for row in self.records.rows]
+
 
 
 meta_sqlite_conn = Connection(root_dir / "ds/meta_db.db")

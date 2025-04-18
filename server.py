@@ -9,8 +9,11 @@ from meta.tasks import add_fetch_task, q
 
 templates = Jinja2Templates(directory='templates')
 
+
 async def home(request):
-    return templates.TemplateResponse(request,'index.html')
+    records = meta_db.get_records()
+    return templates.TemplateResponse(request, 'index.html', context={'records': records})
+
 
 async def show(request):
     id = request.path_params['id']
