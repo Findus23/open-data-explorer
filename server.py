@@ -19,7 +19,7 @@ async def show(request):
     id = request.path_params['id']
     resource = meta_db.get_record(id=id)
 
-    if resource is None:
+    if resource is None or True:
         return templates.TemplateResponse(request, 'confirm_fetch.html', context={'id': id})
 
     # return RedirectResponse(request.url_for('fetch_start', id=id))

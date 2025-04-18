@@ -2,12 +2,15 @@ import csv
 import tempfile
 from datetime import datetime
 
+import chardet
+from chardet import UniversalDetector
 from sqlite_utils import Database
 from sqlite_utils.utils import file_progress, TypeTracker
 
 from .datagv import get_metadata
 from .globals import s
 from .meta_db import Record, Resource, meta_db
+from .processes import run_datasette_inspect
 from .progress_logger import RecordLogger
 
 
@@ -15,7 +18,8 @@ def fetch_dataset(id: str, task_id: str):
     logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
     datagv_meta = get_metadata(id)
-    db = Database(f"ds/{id}.db", recreate=True)
+    db_filename = f"ds/{id}.db"
+    db = Database(db_filename, recreate=True)
     db.enable_wal()
 
     meta_obj = Record(
@@ -55,13 +59,21 @@ def fetch_dataset(id: str, task_id: str):
         r.raise_for_status()
         logger.set_status(f"importing resource {i}/{num_res}")
         with tempfile.TemporaryFile("w+") as f:
-            encoding = "utf-8"
+            logger.set_status(f"guessing encoding {i}/{num_res}")
+            detector = UniversalDetector()
+            for line in r.content.splitlines():
+                detector.feed(line)
+                if detector.done:
+                    break
+            detector.close()
+            print(detector.result)
+            encoding = detector.result["encoding"]
             f.write(r.content.decode(encoding, "ignore"))
-            print(f.tell())
 
             f.seek(0)
+            logger.set_status(f"guessing CSV type {i}/{num_res}")
+
             start = f.read(4048)  # .decode(encoding, "ignore")
-            print(start)
             dialect = csv.Sniffer().sniff(start)
             has_header = csv.Sniffer().has_header(start)
             print(has_header)
@@ -77,16 +89,19 @@ def fetch_dataset(id: str, task_id: str):
                     # exit()
                     return row
 
+                logger.set_status(f"reading CSV file {i}/{num_res}")
+
                 docs = (dict(zip(first_row, clean_row(row))) for row in reader)
+                logger.set_status(f"detecting types {i}/{num_res}")
+
                 tracker = TypeTracker()
                 docs = tracker.wrap(docs)
 
                 db[name].insert_all(docs)
-                print(tracker.types)
                 db[name].transform(types=tracker.types)
+                logger.set_status(f"adding indices {i}/{num_res}")
                 for col in db[name].columns:
                     coldet = db[name].analyze_column(col.name, most_common=False, least_common=False)
-                    print(coldet)
                     if coldet.num_distinct < 50 < coldet.total_rows:
                         db[name].create_index([col.name])
 
@@ -98,6 +113,7 @@ def fetch_dataset(id: str, task_id: str):
             url=url,
             mimetype=res["mimetype"],
             position=res["position"],
+            encoding=encoding,
             last_fetched=datetime.now(),
         )
         meta_db.upsert_resource(res["id"], meta_res)
@@ -106,11 +122,14 @@ def fetch_dataset(id: str, task_id: str):
     logger.set_status("optimizing database")
 
     db.analyze()
+    db.disable_wal()
     db.vacuum()
     # https://til.simonwillison.net/sqlite/database-file-size
     curr = db.execute("select page_size * page_count from pragma_page_count(), pragma_page_size()")
     db_size = curr.fetchone()[0]
+    inspect_data = run_datasette_inspect(f"{id}.db")
     meta_obj.db_size = db_size
+    meta_obj.inspect_data = inspect_data
     meta_db.upsert_record(id, meta_obj)
     db.close()
     logger.set_status("done")

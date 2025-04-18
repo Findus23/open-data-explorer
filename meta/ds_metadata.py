@@ -12,6 +12,7 @@ metadata_dir = root_dir / "metadata"
 schema_file = metadata_dir / "schema.json"
 metadata_output_file = root_dir / "ds" / "metadata.yaml"
 datasette_conf_output_file = root_dir / "ds" / "datasette.yaml"
+inspect_output_file = root_dir / "ds" / "inspect-data.json"
 
 
 class CannedQuery(BaseModel):
@@ -74,8 +75,10 @@ def create_ds_metadata():
     with (metadata_dir / "datasette.yaml").open() as f:
         datasette_conf = yaml.safe_load(f)
         datasette_conf["databases"] = {}
+    inspect_data = {}
 
     for record in meta_db.get_records():
+        inspect_data[record.id] = record.inspect_data
         db_meta = DatabaseMeta(
             source=record.publisher,
             source_url=record.datagvurl,
@@ -123,6 +126,14 @@ def create_ds_metadata():
         yaml.dump(metadata.model_dump(exclude_none=True), f, sort_keys=False)
     with datasette_conf_output_file.open("w") as f:
         yaml.dump(datasette_conf, f, sort_keys=False)
+
+    inspect_dict = {}
+    for id, insp_str in inspect_data.items():
+        insp_data = json.loads(insp_str)
+        inspect_dict[id] = insp_data
+
+    with inspect_output_file.open("w") as f:
+        json.dump(inspect_dict, f, indent=2, ensure_ascii=False)
 
 
 if __name__ == '__main__':
