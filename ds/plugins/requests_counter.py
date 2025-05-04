@@ -23,7 +23,7 @@ def permission_allowed(action, resource):
 
     global save_counter
     save_counter += 1
-    if save_counter % 100 == 0:
+    if save_counter % 10 == 0:
         store_counter()
         save_counter = 0
 
