@@ -1,25 +1,60 @@
 import csv
+import subprocess
+import sys
 import tempfile
 from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
 
-import chardet
 from chardet import UniversalDetector
 from sqlite_utils import Database
 from sqlite_utils.utils import file_progress, TypeTracker
 
 from .datagv import get_metadata
-from .globals import s
+from .globals import s, ds_dir
 from .meta_db import Record, Resource, meta_db
-from .processes import run_datasette_inspect
+from .processes import run_datasette_inspect, restart_datasette_process
 from .progress_logger import RecordLogger
+
+
+def allowed_fetch_url(url: str) -> bool:
+    host = urlparse(url).hostname
+    allowed_hosts = [
+        ".ac.at", ".gv.at",
+        "offenerhaushalt.at",
+        "arbeitsmarktdatenbank.at"
+    ]
+    for tld in allowed_hosts:
+        if host.endswith(tld):
+            return True
+
+    return False
+
+
+def zstd_file_size(file: Path):
+    proc = subprocess.Popen([
+        "zstd", "-c", str(file),
+    ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    total = 0
+    assert proc.stdout is not None
+
+    while True:
+        chunk = proc.stdout.read(8192)
+        if not chunk:
+            break
+        total += len(chunk)
+    ret = proc.wait()
+    if ret != 0:
+        raise RuntimeError(f"zstd returned {ret}")
+    return total
 
 
 def fetch_dataset(id: str, task_id: str):
     logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
     datagv_meta = get_metadata(id)
-    db_filename = f"ds/{id}.db"
-    db = Database(db_filename, recreate=True)
+    db_file = ds_dir / f"{id}.db"
+    db = Database(db_file, recreate=True)
     db.enable_wal()
 
     meta_obj = Record(
@@ -50,10 +85,12 @@ def fetch_dataset(id: str, task_id: str):
         format = res["format"]
         name = res["name"]
         if format != "CSV":
-            print(f"skipping {name} ({format})")
+            logger.set_status(f"skipping {name} ({format})")
             continue
 
         url = res["url"]
+        if not allowed_fetch_url(url):
+            logger.set_status(f"skipping resource {i}/{num_res}")
 
         r = s.get(url)
         r.raise_for_status()
@@ -75,6 +112,8 @@ def fetch_dataset(id: str, task_id: str):
 
             start = f.read(4048)  # .decode(encoding, "ignore")
             dialect = csv.Sniffer().sniff(start)
+            print(dialect)
+            print(dialect.__dict__)
             has_header = csv.Sniffer().has_header(start)
             print(has_header)
             f.seek(0)
@@ -127,9 +166,33 @@ def fetch_dataset(id: str, task_id: str):
     # https://til.simonwillison.net/sqlite/database-file-size
     curr = db.execute("select page_size * page_count from pragma_page_count(), pragma_page_size()")
     db_size = curr.fetchone()[0]
+    db.close()
+
     inspect_data = run_datasette_inspect(f"{id}.db")
     meta_obj.db_size = db_size
+    meta_obj.compressed_size = zstd_file_size(db_file)
     meta_obj.inspect_data = inspect_data
     meta_db.upsert_record(id, meta_obj)
-    db.close()
     logger.set_status("done")
+
+
+def delete_dataset(id: str):
+    assert "." not in id
+    with meta_db.conn:
+        dataset_file = ds_dir / f"{id}.db"
+        assert dataset_file.exists()
+        dataset_file.unlink()
+
+        meta_db.conn.execute("DELETE FROM records WHERE id = ?", (id,))
+        restart_datasette_process()
+
+
+if __name__ == '__main__':
+    id = sys.argv[1]
+    try:
+        delete_dataset(id)
+    except Exception as e:
+        print(e)
+    fetch_dataset(id, "no_task")
+
+    restart_datasette_process()

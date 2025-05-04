@@ -12,14 +12,20 @@ templates = Jinja2Templates(directory='templates')
 
 async def home(request):
     records = meta_db.get_records()
-    return templates.TemplateResponse(request, 'index.html', context={'records': records})
+    total_storage = meta_db.total_storage()
+    print(total_storage)
+    return templates.TemplateResponse(request, 'index.html', context={
+        "records": records,
+        "total_storage": total_storage[0] / 1024 / 1024,
+        "total_storage_comp": total_storage[1] / 1024 / 1024,
+    })
 
 
 async def show(request):
     id = request.path_params['id']
     resource = meta_db.get_record(id=id)
 
-    if resource is None or True:
+    if resource is None:
         return templates.TemplateResponse(request, 'confirm_fetch.html', context={'id': id})
 
     # return RedirectResponse(request.url_for('fetch_start', id=id))
@@ -44,8 +50,13 @@ async def task_page(request):
 
 async def task_status(request):
     task_id = request.path_params['task_id']
-    task_status, task_data = q.get_job_status(task_id)
-    status = RecordLogger.get_latest_status_by_task_id(task_id)
+    try:
+        task_status, task_data = q.get_job_status(task_id)
+        status = RecordLogger.get_latest_status_by_task_id(task_id)
+    except TypeError:
+        task_status, task_data = None, None
+        status = "unknown"
+
     if task_status == 2:
         redirect_url = request.url_for("show", id=task_data["properties"]["id"]).path
     else:

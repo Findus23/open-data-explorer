@@ -4,9 +4,10 @@ from typing import Optional
 import yaml
 from pydantic import BaseModel
 
+from meta.processes import restart_datasette_process
 from .globals import root_dir
 from .meta_db import meta_db
-from .utils import merge_models, Url
+from .utils import merge_models, Url, pretty_byte_size
 
 metadata_dir = root_dir / "metadata"
 schema_file = metadata_dir / "schema.json"
@@ -79,6 +80,8 @@ def create_ds_metadata():
 
     for record in meta_db.get_records():
         inspect_data[record.id] = record.inspect_data
+        db_description=record.notes
+        db_description+=f"\n\n({pretty_byte_size(record.db_size)}, {pretty_byte_size(record.compressed_size)} komprimiert)"
         db_meta = DatabaseMeta(
             source=record.publisher,
             source_url=record.datagvurl,
@@ -87,7 +90,7 @@ def create_ds_metadata():
             about=record.maintainer,
             about_url=record.metadata_linkage,
             title=record.title,
-            description=record.notes,  # add more in the future
+            description=db_description,  # add more in the future
         )
         for resource in meta_db.get_resources(record):
             res_meta = TableMeta(
@@ -138,3 +141,4 @@ def create_ds_metadata():
 
 if __name__ == '__main__':
     create_ds_metadata()
+    restart_datasette_process()

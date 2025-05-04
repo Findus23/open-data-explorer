@@ -23,9 +23,11 @@
             const data = await response.json();
             messageBox.textContent = data.status;
 
-            if (data.task_status == 2) {
-                const redirect_url = data.redirect_url
-                window.location.replace(redirect_url)
+            if (data.task_status === 2) {
+                setTimeout(function () {
+                    const redirect_url = data.redirect_url
+                    window.location.replace(redirect_url)
+                }, 1000)
             }
 
         } catch (error) {

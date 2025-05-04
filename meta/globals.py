@@ -7,6 +7,6 @@ from pathlib import Path
 import requests_cache
 
 root_dir = Path(__file__).parent.parent
-
-s = requests_cache.CachedSession(root_dir / 'ds/requests_cache', expire_after=timedelta(hours=1))
+ds_dir = root_dir / "ds"
+s = requests_cache.CachedSession(ds_dir / 'requests_cache', expire_after=timedelta(hours=1))
 s.cache.delete(expired=True)

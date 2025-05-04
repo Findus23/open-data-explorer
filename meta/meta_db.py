@@ -30,6 +30,7 @@ class Record(BaseModel):
     inspect_data: Optional[str] = None
 
     db_size: Optional[int] = None
+    compressed_size: Optional[int] = None
     num_queries: Optional[int] = 0
 
     @property
@@ -94,8 +95,11 @@ class MetaDatabase:
     def get_records(self) -> list[Record]:
         return [self.self_rec_row_to_record(row) for row in self.records.rows]
 
-    def total_storage(self) -> int:  #
-        self.conn.execute("SELECT SUM(db_size) FROM records")
+    def total_storage(self) -> tuple[int, int]:  #
+        return (
+            self.conn.execute("SELECT SUM(db_size) FROM records").fetchone()[0],
+            self.conn.execute("SELECT SUM(compressed_size) FROM records").fetchone()[0]
+        )
 
 
 meta_sqlite_conn = Connection(root_dir / "ds/meta_db.db")

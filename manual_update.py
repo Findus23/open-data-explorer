@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlite_utils import Database
 from sqlite_utils.db import NotFoundError
 
+from meta.fetcher import zstd_file_size
 from meta.meta_db import meta_db
 from meta.processes import run_datasette_inspect
 
@@ -11,7 +12,7 @@ for file in Path("ds").glob("*.db"):
         continue
     print(file)
     try:
-        meta=meta_db.db["records"].get(file.stem)
+        meta = meta_db.db["records"].get(file.stem)
     except NotFoundError:
         print(file, "not found")
         input("delete")
@@ -31,9 +32,8 @@ for file in Path("ds").glob("*.db"):
     db.close()
 
     inspect_data = run_datasette_inspect(file.name)
-    meta_db.db["records"].update(file.stem,{
-        "db_size":db_size,
-        "inspect_data":inspect_data,
+    meta_db.db["records"].update(file.stem, {
+        "db_size": db_size,
+        "compressed_size": zstd_file_size(file),
+        "inspect_data": inspect_data,
     })
-
-
