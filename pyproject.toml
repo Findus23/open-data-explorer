@@ -6,7 +6,7 @@ authors = [
     {name = "Lukas Winkler",email = "git@lw1.at"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13,<4"
 dependencies = [
     "requests (>=2.32.3,<3.0.0)",
     "datasette @ file:///home/lukas/PycharmProjects/open-data-explorer/datasette",
@@ -17,6 +17,9 @@ dependencies = [
     "jinja2 (>=3.1.6,<4.0.0)",
     "babel (>=2.17.0,<3.0.0)",
     "chardet (>=5.2.0,<6.0.0)",
+    "geopandas (>=1.0.1,<2.0.0)",
+    "geojson-to-sqlite (>=1.1.1,<2.0.0)",
+    "fiona (>=1.10.1,<2.0.0)",
 ]
 
 
