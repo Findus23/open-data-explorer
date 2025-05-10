@@ -49,6 +49,59 @@ def zstd_file_size(file: Path):
     return total
 
 
+def import_csv(db, i, logger, name, num_res, r):
+    with tempfile.TemporaryFile("w+") as f:
+        logger.set_status(f"guessing encoding {i}/{num_res}")
+        detector = UniversalDetector()
+        for line in r.content.splitlines():
+            detector.feed(line)
+            if detector.done:
+                break
+        detector.close()
+        print(detector.result)
+        encoding = detector.result["encoding"]
+        f.write(r.content.decode(encoding, "ignore"))
+
+        f.seek(0)
+        logger.set_status(f"guessing CSV type {i}/{num_res}")
+
+        start = f.read(4048)  # .decode(encoding, "ignore")
+        dialect = csv.Sniffer().sniff(start)
+        print(dialect)
+        print(dialect.__dict__)
+        has_header = csv.Sniffer().has_header(start)
+        print(has_header)
+        f.seek(0)
+        with file_progress(f) as f_prog:
+            reader = csv.reader(f_prog, dialect)
+            first_row = next(reader)
+
+            def clean_row(row):
+                # print(row)
+                row = list(map(lambda x: x.replace(",", "."), row))
+                # print(row)
+                # exit()
+                return row
+
+            logger.set_status(f"reading CSV file {i}/{num_res}")
+
+            docs = (dict(zip(first_row, clean_row(row))) for row in reader)
+            logger.set_status(f"detecting types {i}/{num_res}")
+
+            tracker = TypeTracker()
+            docs = tracker.wrap(docs)
+
+            db[name].insert_all(docs)
+            db[name].transform(types=tracker.types)
+            logger.set_status(f"adding indices {i}/{num_res}")
+            for col in db[name].columns:
+                coldet = db[name].analyze_column(col.name, most_common=False, least_common=False)
+                if coldet.num_distinct < 50 < coldet.total_rows:
+                    db[name].create_index([col.name])
+    return encoding
+
+
+
 def fetch_dataset(id: str, task_id: str):
     logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
@@ -95,54 +148,7 @@ def fetch_dataset(id: str, task_id: str):
         r = s.get(url)
         r.raise_for_status()
         logger.set_status(f"importing resource {i}/{num_res}")
-        with tempfile.TemporaryFile("w+") as f:
-            logger.set_status(f"guessing encoding {i}/{num_res}")
-            detector = UniversalDetector()
-            for line in r.content.splitlines():
-                detector.feed(line)
-                if detector.done:
-                    break
-            detector.close()
-            print(detector.result)
-            encoding = detector.result["encoding"]
-            f.write(r.content.decode(encoding, "ignore"))
-
-            f.seek(0)
-            logger.set_status(f"guessing CSV type {i}/{num_res}")
-
-            start = f.read(4048)  # .decode(encoding, "ignore")
-            dialect = csv.Sniffer().sniff(start)
-            print(dialect)
-            print(dialect.__dict__)
-            has_header = csv.Sniffer().has_header(start)
-            print(has_header)
-            f.seek(0)
-            with file_progress(f) as f_prog:
-                reader = csv.reader(f_prog, dialect)
-                first_row = next(reader)
-
-                def clean_row(row):
-                    # print(row)
-                    row = list(map(lambda x: x.replace(",", "."), row))
-                    # print(row)
-                    # exit()
-                    return row
-
-                logger.set_status(f"reading CSV file {i}/{num_res}")
-
-                docs = (dict(zip(first_row, clean_row(row))) for row in reader)
-                logger.set_status(f"detecting types {i}/{num_res}")
-
-                tracker = TypeTracker()
-                docs = tracker.wrap(docs)
-
-                db[name].insert_all(docs)
-                db[name].transform(types=tracker.types)
-                logger.set_status(f"adding indices {i}/{num_res}")
-                for col in db[name].columns:
-                    coldet = db[name].analyze_column(col.name, most_common=False, least_common=False)
-                    if coldet.num_distinct < 50 < coldet.total_rows:
-                        db[name].create_index([col.name])
+        encoding = import_csv(db, i, logger, name, num_res, r)
 
         meta_res = Resource(
             id=res["id"],
