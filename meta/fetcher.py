@@ -3,13 +3,18 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
+import pandas as pd
 from chardet import UniversalDetector
+from requests import Response
 from sqlite_utils import Database
 from sqlite_utils.utils import file_progress, TypeTracker
 
+from meta import create_ds_metadata
+from meta.hardcoded_fixes import fix_url
 from .datagv import get_metadata
 from .globals import s, ds_dir
 from .meta_db import Record, Resource, meta_db
@@ -49,7 +54,7 @@ def zstd_file_size(file: Path):
     return total
 
 
-def import_csv(db, i, logger, name, num_res, r):
+def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, i: int, num_res: int):
     with tempfile.TemporaryFile("w+") as f:
         logger.set_status(f"guessing encoding {i}/{num_res}")
         detector = UniversalDetector()
@@ -93,13 +98,15 @@ def import_csv(db, i, logger, name, num_res, r):
 
             db[name].insert_all(docs)
             db[name].transform(types=tracker.types)
-            logger.set_status(f"adding indices {i}/{num_res}")
-            for col in db[name].columns:
-                coldet = db[name].analyze_column(col.name, most_common=False, least_common=False)
-                if coldet.num_distinct < 50 < coldet.total_rows:
-                    db[name].create_index([col.name])
     return encoding
 
+
+def import_xlsx(db: Database, r: Response, logger: RecordLogger, name: str, i: int, num_res: int):
+    excel_data = BytesIO(r.content)
+    dfs = pd.read_excel(excel_data, sheet_name=None)
+    for table, df in dfs.items():
+        print(df.head)
+        df.to_sql(table, db.conn)
 
 
 def fetch_dataset(id: str, task_id: str):
@@ -116,7 +123,7 @@ def fetch_dataset(id: str, task_id: str):
         publisher=datagv_meta["publisher"],
         notes=datagv_meta["notes"],
 
-        license_citation=datagv_meta["license_citation"],
+        license_citation=datagv_meta["license_citation"] if "license_citation" in datagv_meta else None,
         license_id=datagv_meta["license_id"],
         license_title=datagv_meta["license_title"],
         license_url=datagv_meta["license_url"],
@@ -126,8 +133,8 @@ def fetch_dataset(id: str, task_id: str):
         metadata_modified=datagv_meta["metadata_modified"],
         metadata_linkage=datagv_meta["metadata_linkage"] if "metadata_linkage" in datagv_meta else None,
 
-        attribute_description=datagv_meta["attribute_description"],
-        geographic_toponym=datagv_meta["geographic_toponym"],
+        attribute_description=datagv_meta["attribute_description"] if "attribute_description" in datagv_meta else None,
+        geographic_toponym=datagv_meta["geographic_toponym"] if "geographic_toponym" in datagv_meta else None,
         tags=[p["display_name"] for p in datagv_meta["tags"]],
         api_data=datagv_meta,
     )
@@ -137,18 +144,25 @@ def fetch_dataset(id: str, task_id: str):
 
         format = res["format"]
         name = res["name"]
-        if format != "CSV":
+        if format not in ["CSV", "XLSX"]:
             logger.set_status(f"skipping {name} ({format})")
             continue
 
         url = res["url"]
+        url = fix_url(url)
         if not allowed_fetch_url(url):
             logger.set_status(f"skipping resource {i}/{num_res}")
 
         r = s.get(url)
         r.raise_for_status()
         logger.set_status(f"importing resource {i}/{num_res}")
-        encoding = import_csv(db, i, logger, name, num_res, r)
+        if format == "CSV":
+            encoding = import_csv(db, r, logger, name, i, num_res)
+        elif format == "XLSX":
+            encoding = "xlsx"
+            import_xlsx(db, r, logger, name, i, num_res)
+        else:
+            raise RuntimeError(f"unsupported format {format}")
 
         meta_res = Resource(
             id=res["id"],
@@ -162,6 +176,14 @@ def fetch_dataset(id: str, task_id: str):
             last_fetched=datetime.now(),
         )
         meta_db.upsert_resource(res["id"], meta_res)
+
+    logger.set_status(f"adding indices {i}/{num_res}")
+    for tab in db.tables:
+        for col in tab.columns:
+            coldet = tab.analyze_column(col.name, most_common=False, least_common=False)
+            if coldet.num_distinct < 50 < coldet.total_rows:
+                tab.create_index([col.name])
+
 
     # db.index_foreign_keys()
     logger.set_status("optimizing database")
@@ -200,5 +222,5 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
     fetch_dataset(id, "no_task")
-
+    create_ds_metadata()
     restart_datasette_process()

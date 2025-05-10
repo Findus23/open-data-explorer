@@ -15,7 +15,7 @@ class Record(BaseModel):
     title: str
     publisher: str
     notes: str
-    license_citation: str
+    license_citation: Optional[str] = None
     license_id: str
     license_title: str
     license_url: Url
@@ -23,8 +23,8 @@ class Record(BaseModel):
     metadata_linkage: Optional[Url]
     metadata_created: str
     metadata_modified: str
-    attribute_description: str
-    geographic_toponym: str
+    attribute_description: Optional[str] = None
+    geographic_toponym: Optional[str] = None
     tags: list[str]
     api_data: dict
     inspect_data: Optional[str] = None
