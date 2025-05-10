@@ -20,6 +20,7 @@ class RecordLogger:
         meta_db.db["logging"].create_index(["task_id"], if_not_exists=True)
 
     def set_status(self, status: str):
+        print("logger:",status)
         self.log.insert({
             "record_id": self.record_id,
             "task_id": self.task_id,

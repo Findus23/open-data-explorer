@@ -14,7 +14,8 @@ from sqlite_utils import Database
 from sqlite_utils.utils import file_progress, TypeTracker
 
 from meta import create_ds_metadata
-from meta.hardcoded_fixes import fix_url
+from meta.hardcoded_fixes import fix_url, format_normalizer
+from meta.parlament import import_parlament
 from .datagv import get_metadata
 from .globals import s, ds_dir
 from .meta_db import Record, Resource, meta_db
@@ -102,11 +103,14 @@ def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, i: in
 
 
 def import_xlsx(db: Database, r: Response, logger: RecordLogger, name: str, i: int, num_res: int):
+    logger.set_status(f"reading Excel file {i}/{num_res}")
     excel_data = BytesIO(r.content)
     dfs = pd.read_excel(excel_data, sheet_name=None)
     for table, df in dfs.items():
         print(df.head)
-        df.to_sql(table, db.conn)
+        df.to_sql(name + "_" + table, db.conn)
+
+
 
 
 def fetch_dataset(id: str, task_id: str):
@@ -143,26 +147,34 @@ def fetch_dataset(id: str, task_id: str):
         logger.set_status(f"fetching resource {i}/{num_res}")
 
         format = res["format"]
+        format = format_normalizer(format)
         name = res["name"]
-        if format not in ["CSV", "XLSX"]:
+        if format not in ["CSV", "XLSX", "XLS", "JSON"]:
             logger.set_status(f"skipping {name} ({format})")
             continue
-
         url = res["url"]
         url = fix_url(url)
+        if format == "JSON":
+            if "www.parlament.gv.at" not in url:
+                continue
+
         if not allowed_fetch_url(url):
             logger.set_status(f"skipping resource {i}/{num_res}")
 
-        r = s.get(url)
-        r.raise_for_status()
-        logger.set_status(f"importing resource {i}/{num_res}")
-        if format == "CSV":
-            encoding = import_csv(db, r, logger, name, i, num_res)
-        elif format == "XLSX":
-            encoding = "xlsx"
-            import_xlsx(db, r, logger, name, i, num_res)
+        if format == "JSON":
+            encoding = ""
+            import_parlament(db, id, logger, name, i, num_res)
         else:
-            raise RuntimeError(f"unsupported format {format}")
+            r = s.get(url)
+            r.raise_for_status()
+            logger.set_status(f"importing resource {i}/{num_res}")
+            if format == "CSV":
+                encoding = import_csv(db, r, logger, name, i, num_res)
+            elif format in ["XLSX", "XLS"]:
+                encoding = format
+                import_xlsx(db, r, logger, name, i, num_res)
+            else:
+                raise RuntimeError(f"unsupported format {format}")
 
         meta_res = Resource(
             id=res["id"],
@@ -183,7 +195,8 @@ def fetch_dataset(id: str, task_id: str):
             coldet = tab.analyze_column(col.name, most_common=False, least_common=False)
             if coldet.num_distinct < 50 < coldet.total_rows:
                 tab.create_index([col.name])
-
+        # print("enable FTS")
+        # tab.enable_fts(["PFAD"])
 
     # db.index_foreign_keys()
     logger.set_status("optimizing database")
