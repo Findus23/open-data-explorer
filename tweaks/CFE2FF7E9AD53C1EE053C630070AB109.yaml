@@ -1,0 +1,6 @@
+# https://www.data.gv.at/katalog/de/dataset/arbeitslose-nach-geschlecht-verweildauer-und-altersgruppen-abgang-ds-verweildauer-in-tagen
+
+tables:
+  "Abgang_AL_Geschlecht_Altersgruppen_VWD_RGS.csv":
+    additional_indices:
+      - [ "Datum" ]

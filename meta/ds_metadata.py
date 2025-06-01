@@ -10,7 +10,9 @@ from .meta_db import meta_db
 from .utils import merge_models, Url, pretty_byte_size
 
 metadata_dir = root_dir / "metadata"
+tweaks_dir = root_dir / "tweaks"
 schema_file = metadata_dir / "schema.json"
+tweaks_schema_file = tweaks_dir / "schema.json"
 metadata_output_file = root_dir / "ds" / "metadata.yaml"
 datasette_conf_output_file = root_dir / "ds" / "datasette.yaml"
 inspect_output_file = root_dir / "ds" / "inspect-data.json"
@@ -64,10 +66,40 @@ class MetaData(BaseModel):
     databases: dict[str, DatabaseMeta] = {}
 
 
+class TableTweaks(BaseModel):
+    additional_indices: Optional[list[tuple[str, ...]]] = None
+    fts_indices: Optional[list[tuple[str, ...]]] = None
+
+
+class CSVDialectTweak(BaseModel):
+    delimiter: str = ","
+    doublequote: bool = True
+    escapechar: Optional[str] = None
+    lineterminator: str = "\r\n"
+    quotechar: str = '"'
+    quoting: int = 0  # csv.QUOTE_MINIMAL
+    skipinitialspace: bool = False
+    strict: bool = False
+
+
+class ResourceTweaks(BaseModel):
+    csv_dialect: Optional[CSVDialectTweak] = None
+    encoding: Optional[str] = None
+
+
+class Tweaks(BaseModel):
+    custom_user_agent: Optional[str] = None
+    tables: dict[str, TableTweaks] = {}
+    resources: dict[str, ResourceTweaks] = {}
+
+
 def create_schema_file():
     with schema_file.open("w") as f:
         print(type(DatabaseMeta.model_json_schema()))
         json.dump(DatabaseMeta.model_json_schema(), f, indent=2, ensure_ascii=False)
+    with tweaks_schema_file.open("w") as f:
+        print(type(Tweaks.model_json_schema()))
+        json.dump(Tweaks.model_json_schema(), f, indent=2, ensure_ascii=False)
 
 
 def create_ds_metadata():
@@ -80,8 +112,8 @@ def create_ds_metadata():
 
     for record in meta_db.get_records():
         inspect_data[record.id] = record.inspect_data
-        db_description=record.notes
-        db_description+=f"\n\n({pretty_byte_size(record.db_size)}, {pretty_byte_size(record.compressed_size)} komprimiert)"
+        db_description = record.notes
+        db_description += f"\n\n({pretty_byte_size(record.db_size)}, {pretty_byte_size(record.compressed_size)} komprimiert)"
         db_meta = DatabaseMeta(
             source=record.publisher,
             source_url=record.datagvurl,

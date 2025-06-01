@@ -8,16 +8,18 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+import yaml
 from chardet import UniversalDetector
 from requests import Response
 from sqlite_utils import Database
 from sqlite_utils.utils import file_progress, TypeTracker
 
 from meta import create_ds_metadata
+from meta.ds_metadata import Tweaks, TableTweaks, ResourceTweaks, CSVDialectTweak
 from meta.hardcoded_fixes import fix_url, format_normalizer
 from meta.parlament import import_parlament
 from .datagv import get_metadata
-from .globals import s, ds_dir
+from .globals import s, ds_dir, tweaks_dir
 from .meta_db import Record, Resource, meta_db
 from .processes import run_datasette_inspect, restart_datasette_process
 from .progress_logger import RecordLogger
@@ -55,28 +57,54 @@ def zstd_file_size(file: Path):
     return total
 
 
-def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, i: int, num_res: int):
+def create_csv_dialect(t_dialect: CSVDialectTweak) -> type(csv.Dialect):
+    class CustomDialect(csv.Dialect):
+        ...
+
+    CustomDialect.delimiter = t_dialect.delimiter
+    CustomDialect.doublequote = t_dialect.doublequote
+    CustomDialect.escapechar = t_dialect.escapechar
+    CustomDialect.lineterminator = t_dialect.lineterminator
+    CustomDialect.quotechar = t_dialect.quotechar
+    CustomDialect.quoting = t_dialect.quoting
+    assert t_dialect.quoting == csv.QUOTE_MINIMAL
+    CustomDialect.skipinitialspace = t_dialect.skipinitialspace
+    CustomDialect.strict = t_dialect.strict
+    return CustomDialect
+
+
+def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, tweaks: ResourceTweaks):
     with tempfile.TemporaryFile("w+") as f:
-        logger.set_status(f"guessing encoding {i}/{num_res}")
-        detector = UniversalDetector()
-        for line in r.content.splitlines():
-            detector.feed(line)
-            if detector.done:
-                break
-        detector.close()
-        print(detector.result)
-        encoding = detector.result["encoding"]
+        if tweaks.encoding is not None:
+            logger
+            encoding = tweaks.encoding
+        else:
+            logger.set_status(f"guessing encoding")
+            detector = UniversalDetector()
+            for line in r.content.splitlines()[:1000]:
+                detector.feed(line)
+                if detector.done:
+                    break
+            detector.close()
+            logger.set_status(f"guess result: {detector.result}")
+
+            encoding = detector.result["encoding"]
         f.write(r.content.decode(encoding, "ignore"))
 
-        f.seek(0)
-        logger.set_status(f"guessing CSV type {i}/{num_res}")
+        if tweaks.csv_dialect is not None:
+            dialect = create_csv_dialect(tweaks.csv_dialect)
+        else:
+            f.seek(0)
+            logger.set_status(f"guessing CSV type")
+            start = f.read(4048)
+            dialect = csv.Sniffer().sniff(start)
+            has_header = csv.Sniffer().has_header(start)
+            print(has_header)
 
-        start = f.read(4048)  # .decode(encoding, "ignore")
-        dialect = csv.Sniffer().sniff(start)
+        logger.set_status(f"using CSV with delimiter {dialect.delimiter}")
+
         print(dialect)
         print(dialect.__dict__)
-        has_header = csv.Sniffer().has_header(start)
-        print(has_header)
         f.seek(0)
         with file_progress(f) as f_prog:
             reader = csv.reader(f_prog, dialect)
@@ -89,10 +117,10 @@ def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, i: in
                 # exit()
                 return row
 
-            logger.set_status(f"reading CSV file {i}/{num_res}")
+            logger.set_status(f"reading CSV file")
 
             docs = (dict(zip(first_row, clean_row(row))) for row in reader)
-            logger.set_status(f"detecting types {i}/{num_res}")
+            logger.set_status(f"detecting types")
 
             tracker = TypeTracker()
             docs = tracker.wrap(docs)
@@ -111,8 +139,6 @@ def import_xlsx(db: Database, r: Response, logger: RecordLogger, name: str, i: i
         df.to_sql(name + "_" + table, db.conn)
 
 
-
-
 def fetch_dataset(id: str, task_id: str):
     logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
@@ -120,6 +146,13 @@ def fetch_dataset(id: str, task_id: str):
     db_file = ds_dir / f"{id}.db"
     db = Database(db_file, recreate=True)
     db.enable_wal()
+
+    tweaks_file = tweaks_dir / f"{id}.yaml"
+    if tweaks_file.exists():
+        with tweaks_file.open() as f:
+            tweaks = Tweaks(**yaml.load(f, Loader=yaml.SafeLoader))
+    else:
+        tweaks = Tweaks()
 
     meta_obj = Record(
         id=id,
@@ -149,6 +182,13 @@ def fetch_dataset(id: str, task_id: str):
         format = res["format"]
         format = format_normalizer(format)
         name = res["name"]
+
+        try:
+            resource_tweaks = tweaks.resources[name]
+        except KeyError:
+            resource_tweaks = ResourceTweaks()
+        print("resource tweaks:", resource_tweaks)
+
         if format not in ["CSV", "XLSX", "XLS", "JSON"]:
             logger.set_status(f"skipping {name} ({format})")
             continue
@@ -165,11 +205,18 @@ def fetch_dataset(id: str, task_id: str):
             encoding = ""
             import_parlament(db, id, logger, name, i, num_res)
         else:
-            r = s.get(url)
+            if tweaks.custom_user_agent:
+                print(tweaks.custom_user_agent)
+                r = s.get(url, headers={"User-Agent": tweaks.custom_user_agent})
+            else:
+                r = s.get(url)
             r.raise_for_status()
+            if r.content.startswith(b"PK\x03\x04"):
+                logger.set_status(f"detected ZIP file, skipping resource {i}/{num_res}")
+                continue
             logger.set_status(f"importing resource {i}/{num_res}")
             if format == "CSV":
-                encoding = import_csv(db, r, logger, name, i, num_res)
+                encoding = import_csv(db, r, logger, name, resource_tweaks)
             elif format in ["XLSX", "XLS"]:
                 encoding = format
                 import_xlsx(db, r, logger, name, i, num_res)
@@ -195,8 +242,24 @@ def fetch_dataset(id: str, task_id: str):
             coldet = tab.analyze_column(col.name, most_common=False, least_common=False)
             if coldet.num_distinct < 50 < coldet.total_rows:
                 tab.create_index([col.name])
-        # print("enable FTS")
-        # tab.enable_fts(["PFAD"])
+
+        print("tweaks")
+        print(tweaks)
+        try:
+            table_tweaks = tweaks.tables[tab.name]
+        except KeyError as e:
+            print(e)
+            table_tweaks = TableTweaks()
+            continue
+        logger.set_status(f"applying table tweaks")
+        if table_tweaks.additional_indices:
+            for add_idx in table_tweaks.additional_indices:
+                logger.set_status(f"adding additional indices to {add_idx}")
+                tab.create_index(add_idx)
+        if table_tweaks.fts_indices:
+            for fts_idx in table_tweaks.fts_indices:
+                logger.set_status(f"adding full-text-search to columns {fts_idx}")
+                tab.enable_fts(fts_idx)
 
     # db.index_foreign_keys()
     logger.set_status("optimizing database")

@@ -1,0 +1,6 @@
+# https://www.data.gv.at/katalog/dataset/c6fc4688-1aca-4363-bd1a-8d14ea08d2f8
+# Grillplätze Standorte Wien
+tables:
+  "WFS GetFeature (CSV)":
+    fts_indices:
+      - [ "LAGE" ]

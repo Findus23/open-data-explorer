@@ -1,0 +1,8 @@
+# https://www.data.gv.at/katalog/dataset/d49a127d-f60f-4d6f-bb1c-46d70ff14699
+# Verwaltungsadressen - Land Salzburg
+
+resources:
+  verwaltungsadressen_sbg:
+    csv_dialect:
+      delimiter: ";"
+    encoding: ISO-8859-1

@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "CSVDialectTweak": {
+      "properties": {
+        "delimiter": {
+          "default": ",",
+          "title": "Delimiter",
+          "type": "string"
+        },
+        "doublequote": {
+          "default": true,
+          "title": "Doublequote",
+          "type": "boolean"
+        },
+        "escapechar": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Escapechar"
+        },
+        "lineterminator": {
+          "default": "\r\n",
+          "title": "Lineterminator",
+          "type": "string"
+        },
+        "quotechar": {
+          "default": "\"",
+          "title": "Quotechar",
+          "type": "string"
+        },
+        "quoting": {
+          "default": 0,
+          "title": "Quoting",
+          "type": "integer"
+        },
+        "skipinitialspace": {
+          "default": false,
+          "title": "Skipinitialspace",
+          "type": "boolean"
+        },
+        "strict": {
+          "default": false,
+          "title": "Strict",
+          "type": "boolean"
+        }
+      },
+      "title": "CSVDialectTweak",
+      "type": "object"
+    },
+    "ResourceTweaks": {
+      "properties": {
+        "csv_dialect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CSVDialectTweak"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Encoding"
+        }
+      },
+      "title": "ResourceTweaks",
+      "type": "object"
+    },
+    "TableTweaks": {
+      "properties": {
+        "additional_indices": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Additional Indices"
+        },
+        "fts_indices": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fts Indices"
+        }
+      },
+      "title": "TableTweaks",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "custom_user_agent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Custom User Agent"
+    },
+    "tables": {
+      "additionalProperties": {
+        "$ref": "#/$defs/TableTweaks"
+      },
+      "default": {},
+      "title": "Tables",
+      "type": "object"
+    },
+    "resources": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ResourceTweaks"
+      },
+      "default": {},
+      "title": "Resources",
+      "type": "object"
+    }
+  },
+  "title": "Tweaks",
+  "type": "object"
+}
