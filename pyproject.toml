@@ -26,6 +26,7 @@ dependencies = [
     "camelot-py[base] (>=1.0.0,<2.0.0)",
     "pillow (>=11.2.1,<12.0.0)",
     "python-magic @ git+https://github.com/ahupp/python-magic.git",
+    "beautifulsoup4 (>=4.13.4,<5.0.0)",
 ]
 
 

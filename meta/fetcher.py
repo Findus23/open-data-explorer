@@ -17,6 +17,7 @@ from sqlite_utils.utils import file_progress, TypeTracker
 from meta import create_ds_metadata
 from meta.ds_metadata import Tweaks, TableTweaks, ResourceTweaks, CSVDialectTweak
 from meta.hardcoded_fixes import fix_url, format_normalizer
+from meta.offenerhaushalt import fetch_offenerhaushalt
 from meta.parlament import import_parlament
 from .datagv import get_metadata
 from .globals import s, ds_dir, tweaks_dir
@@ -211,6 +212,9 @@ def fetch_dataset(id: str, task_id: str):
             else:
                 r = s.get(url)
             r.raise_for_status()
+            if url.startswith("https://offenerhaushalt.at/"):
+                r = fetch_offenerhaushalt(r.content)
+
             if r.content.startswith(b"PK\x03\x04"):
                 logger.set_status(f"detected ZIP file, skipping resource {i}/{num_res}")
                 continue
