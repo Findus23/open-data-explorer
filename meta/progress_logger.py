@@ -36,5 +36,19 @@ class RecordLogger:
         )
         return curr.fetchone()[0]
 
-    def get_latest_status(self):
-        self.get_latest_status_by_id(self.id)
+    @staticmethod
+    def get_all_status_by_record_id(record_id):
+        curr = meta_db.db.execute(
+            "SELECT timestamp,status FROM logging where record_id = ? ORDER BY timestamp DESC",
+            [record_id]
+        )
+        return curr.fetchall()
+
+    @staticmethod
+    def get_all_status_by_task_id(task_id):
+        curr = meta_db.db.execute(
+            "SELECT timestamp,status FROM logging where task_id = ? ORDER BY timestamp DESC",
+            [task_id]
+        )
+        return curr.fetchall()
+

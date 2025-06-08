@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseModel
 from sqlite_utils import Database
 
+from very_simple_task_queue import Job
 from .globals import root_dir
 from .utils import Url
 
@@ -36,6 +37,10 @@ class Record(BaseModel):
     @property
     def datagvurl(self):
         return "https://www.data.gv.at/katalog/dataset/" + self.id
+
+    @property
+    def datasetteurl(self):
+        return "/" + self.id
 
 
 class Resource(BaseModel):
@@ -100,6 +105,12 @@ class MetaDatabase:
             self.conn.execute("SELECT SUM(db_size) FROM records").fetchone()[0],
             self.conn.execute("SELECT SUM(compressed_size) FROM records").fetchone()[0]
         )
+
+    def get_tasks_for_record(self, record: Record) -> list[Job]:
+        conn = self.conn.execute("SELECT job_id,status,data,in_time FROM queue WHERE record= :record_id",
+                                 {"record_id": record.id})
+
+        return [Job(job_id, status, record.id, json.loads(data), in_time) for job_id, status, data, in_time in conn]
 
 
 meta_sqlite_conn = Connection(root_dir / "ds/meta_db.db")

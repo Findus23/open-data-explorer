@@ -1,13 +1,16 @@
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, RedirectResponse
-from starlette.routing import Route
+from starlette.routing import Route, Mount
+from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from meta.meta_db import meta_db
 from meta.progress_logger import RecordLogger
 from meta.tasks import add_fetch_task, q
+from meta.utils import pretty_byte_size
 
 templates = Jinja2Templates(directory='templates')
+templates.env.filters['pretty_byte_size'] = pretty_byte_size
 
 
 async def home(request):
@@ -27,6 +30,23 @@ async def show(request):
 
     if resource is None:
         return templates.TemplateResponse(request, 'confirm_fetch.html', context={'id': id})
+
+    record = meta_db.get_record(id=id)
+    resources = meta_db.get_resources(record=record)
+    tasks = meta_db.get_tasks_for_record(record=record)
+    task_sets=[]
+    for task in tasks:
+        logging = RecordLogger.get_all_status_by_task_id(task.id)
+        task_sets.append((task,logging))
+
+
+    return templates.TemplateResponse(
+        request, 'detail.html',
+        context={
+            'id': id, "record": record,
+            "resources": resources, "logging": logging,
+            "tasks": task_sets
+        })
 
     # return RedirectResponse(request.url_for('fetch_start', id=id))
 
@@ -51,18 +71,18 @@ async def task_page(request):
 async def task_status(request):
     task_id = request.path_params['task_id']
     try:
-        task_status, task_data = q.get_job_status(task_id)
+        task = q.get_job_status(task_id)
         status = RecordLogger.get_latest_status_by_task_id(task_id)
     except TypeError:
-        task_status, task_data = None, None
+        task = None
         status = "unknown"
 
-    if task_status == 2:
-        redirect_url = request.url_for("show", id=task_data["properties"]["id"]).path
+    if task and task.status == 2:
+        redirect_url = request.url_for("show", id=task.record).path
     else:
         redirect_url = None
     return JSONResponse(
-        {'status': status, "task_status": task_status, "task_data": task_data, "redirect_url": redirect_url})
+        {'status': status, "task_status": task.status, "task_data": task.data, "redirect_url": redirect_url})
 
 
 app = Starlette(debug=True, routes=[
@@ -71,4 +91,5 @@ app = Starlette(debug=True, routes=[
     Route('/meta/{id}/fetch', fetch, name='fetch_start', methods=["POST"]),
     Route('/meta/task/{task_id}', task_page, name='task_page'),
     Route('/meta/task/{task_id}/status', task_status, name='task_status'),
+    Mount('/meta/static', app=StaticFiles(directory='static'), name="static"),
 ])

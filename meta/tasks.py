@@ -16,8 +16,8 @@ def add_fetch_task(id: str) -> str:
         raise Exception("resource already exists")
     return q.put({
         "task_type": "fetch_task",
-        "properties": {"id": id}
-    })
+        "properties": {}
+    }, record=id)
 
 
 def start_task_runner():
@@ -29,7 +29,7 @@ def start_task_runner():
             continue
         print(job)
         if job.data["task_type"] == "fetch_task":
-            fetch_dataset(job.data["properties"]["id"], task_id=job.id)
+            fetch_dataset(job.record, task_id=job.id)
             create_ds_metadata()
             restart_datasette_process()
             q.set_job_done(job)
