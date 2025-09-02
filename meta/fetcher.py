@@ -2,7 +2,6 @@ import csv
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,9 +17,10 @@ from meta import create_ds_metadata
 from meta.ds_metadata import Tweaks, TableTweaks, ResourceTweaks, CSVDialectTweak
 from meta.hardcoded_fixes import fix_url, format_normalizer
 from meta.parlament import import_parlament
-from .datagv import get_metadata
+from meta.site_specific.nextcloud import get_nextcloud_shared_url
+from .datagv import get_datagv_metadata
 from .globals import s, ds_dir, tweaks_dir
-from .meta_db import Record, Resource, meta_db
+from .meta_db import meta_db
 from .processes import run_datasette_inspect, restart_datasette_process
 from .progress_logger import RecordLogger
 
@@ -30,7 +30,8 @@ def allowed_fetch_url(url: str) -> bool:
     allowed_hosts = [
         ".ac.at", ".gv.at",
         "offenerhaushalt.at",
-        "arbeitsmarktdatenbank.at"
+        "arbeitsmarktdatenbank.at",
+        "gemeindecloud.at"
     ]
     for tld in allowed_hosts:
         if host.endswith(tld):
@@ -124,6 +125,7 @@ def import_csv(db: Database, r: Response, logger: RecordLogger, name: str, tweak
 
             tracker = TypeTracker()
             docs = tracker.wrap(docs)
+            logger.set_status(f"detected types: {tracker.types}")
 
             db[name].insert_all(docs)
             db[name].transform(types=tracker.types)
@@ -142,7 +144,7 @@ def import_xlsx(db: Database, r: Response, logger: RecordLogger, name: str, i: i
 def fetch_dataset(id: str, task_id: str):
     logger = RecordLogger(id, task_id)
     logger.set_status("fetching dataset")
-    datagv_meta = get_metadata(id)
+    meta_obj, resources = get_datagv_metadata(id)
     db_file = ds_dir / f"{id}.db"
     db = Database(db_file, recreate=True)
     db.enable_wal()
@@ -154,34 +156,13 @@ def fetch_dataset(id: str, task_id: str):
     else:
         tweaks = Tweaks()
 
-    meta_obj = Record(
-        id=id,
-        title=datagv_meta["title"],
-        publisher=datagv_meta["publisher"],
-        notes=datagv_meta["notes"],
-
-        license_citation=datagv_meta["license_citation"] if "license_citation" in datagv_meta else None,
-        license_id=datagv_meta["license_id"],
-        license_title=datagv_meta["license_title"],
-        license_url=datagv_meta["license_url"],
-
-        maintainer=datagv_meta["maintainer"],
-        metadata_created=datagv_meta["metadata_created"],
-        metadata_modified=datagv_meta["metadata_modified"],
-        metadata_linkage=datagv_meta["metadata_linkage"] if "metadata_linkage" in datagv_meta else None,
-
-        attribute_description=datagv_meta["attribute_description"] if "attribute_description" in datagv_meta else None,
-        geographic_toponym=datagv_meta["geographic_toponym"] if "geographic_toponym" in datagv_meta else None,
-        tags=[p["display_name"] for p in datagv_meta["tags"]],
-        api_data=datagv_meta,
-    )
-    num_res = len(datagv_meta["resources"])
-    for i, res in enumerate(datagv_meta["resources"]):
+    num_res = len(resources)
+    for i, resource in enumerate(resources,start=1):
         logger.set_status(f"fetching resource {i}/{num_res}")
 
-        format = res["format"]
-        format = format_normalizer(format)
-        name = res["name"]
+        resource.format = format_normalizer(resource.format)
+        format = resource.format
+        name = resource.name
 
         try:
             resource_tweaks = tweaks.resources[name]
@@ -192,26 +173,30 @@ def fetch_dataset(id: str, task_id: str):
         if format not in ["CSV", "XLSX", "XLS", "JSON"]:
             logger.set_status(f"skipping {name} ({format})")
             continue
-        url = res["url"]
-        url = fix_url(url)
+        resource.url = fix_url(resource.url)
         if format == "JSON":
-            if "www.parlament.gv.at" not in url:
+            if "www.parlament.gv.at" not in resource.url:
                 continue
+            logger.set_status(f"skipping {name} ({format})")
 
-        if not allowed_fetch_url(url):
-            logger.set_status(f"skipping resource {i}/{num_res}")
+
+        if not allowed_fetch_url(resource.url):
+            logger.set_status(f"skipping resource {i}/{num_res} (disallowed server: {resource.url})")
 
         if format == "JSON":
             encoding = ""
             import_parlament(db, id, logger, name, i, num_res)
         else:
-            if tweaks.custom_user_agent:
+            if "index.php/s/" in resource.url:
+                # nextcloud shared folder
+                r = get_nextcloud_shared_url(resource.url, logger)
+            elif tweaks.custom_user_agent:
                 print(tweaks.custom_user_agent)
-                r = s.get(url, headers={"User-Agent": tweaks.custom_user_agent})
+                r = s.get(resource.url, headers={"User-Agent": tweaks.custom_user_agent})
             else:
-                r = s.get(url)
+                r = s.get(resource.url)
             r.raise_for_status()
-            if r.content.startswith(b"PK\x03\x04"):
+            if r.content.startswith(b"PK\x03\x04") and format not in ["XLSX"]:
                 logger.set_status(f"detected ZIP file, skipping resource {i}/{num_res}")
                 continue
             logger.set_status(f"importing resource {i}/{num_res}")
@@ -223,18 +208,7 @@ def fetch_dataset(id: str, task_id: str):
             else:
                 raise RuntimeError(f"unsupported format {format}")
 
-        meta_res = Resource(
-            id=res["id"],
-            record=meta_obj,
-            format=format,
-            name=name,
-            url=url,
-            mimetype=res["mimetype"],
-            position=res["position"],
-            encoding=encoding,
-            last_fetched=datetime.now(),
-        )
-        meta_db.upsert_resource(res["id"], meta_res)
+        meta_db.upsert_resource(resource.id, resource)
 
     logger.set_status(f"adding indices {i}/{num_res}")
     for tab in db.tables:

@@ -44,7 +44,7 @@ async def show(request):
         request, 'detail.html',
         context={
             'id': id, "record": record,
-            "resources": resources, "logging": logging,
+            "resources": resources,
             "tasks": task_sets
         })
 
@@ -70,11 +70,10 @@ async def task_page(request):
 
 async def task_status(request):
     task_id = request.path_params['task_id']
+    task = q.get_job_status(task_id)
     try:
-        task = q.get_job_status(task_id)
         status = RecordLogger.get_latest_status_by_task_id(task_id)
     except TypeError:
-        task = None
         status = "unknown"
 
     if task and task.status == 2:
@@ -91,5 +90,5 @@ app = Starlette(debug=True, routes=[
     Route('/meta/{id}/fetch', fetch, name='fetch_start', methods=["POST"]),
     Route('/meta/task/{task_id}', task_page, name='task_page'),
     Route('/meta/task/{task_id}/status', task_status, name='task_status'),
-    Mount('/meta/static', app=StaticFiles(directory='static'), name="static"),
+    Mount('/meta/static', app=StaticFiles(directory='static',follow_symlink=True), name="static"),
 ])

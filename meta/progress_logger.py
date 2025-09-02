@@ -20,7 +20,7 @@ class RecordLogger:
         meta_db.db["logging"].create_index(["task_id"], if_not_exists=True)
 
     def set_status(self, status: str):
-        print("logger:",status)
+        print("logger:", status)
         self.log.insert({
             "record_id": self.record_id,
             "task_id": self.task_id,
@@ -47,8 +47,15 @@ class RecordLogger:
     @staticmethod
     def get_all_status_by_task_id(task_id):
         curr = meta_db.db.execute(
-            "SELECT timestamp,status FROM logging where task_id = ? ORDER BY timestamp DESC",
+            "SELECT timestamp,status FROM logging where task_id = ? ORDER BY timestamp",
             [task_id]
         )
         return curr.fetchall()
 
+
+class FakeRecordLogger(RecordLogger):
+    def __init__(self):
+        super().__init__("None", "None")
+
+    def set_status(self, status: str):
+        print(status)

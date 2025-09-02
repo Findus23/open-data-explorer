@@ -1,47 +1,50 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-    <link rel="stylesheet" href="/-/static/app.css?449502">
-</head>
-<body>
-<h1>{{ record.title }}</h1>
+{% extends "base.html" %}
 
-<a href="{{ record.datagvurl }}" target="_blank" rel="noopener">
-    <img alt="auf data.gv.at" src="/meta/static/datagv-logo.svg">
-</a>
+{% block main %}
+    <h1>{{ record.title }}</h1>
+    <a href="{{ record.datagvurl }}" target="_blank" rel="noopener">
+        <img alt="auf data.gv.at" src="/meta/static/datagv-logo.svg">
+    </a>
 
-<a href="{{ record.datasetteurl }}">test</a>
+    <a href="{{ record.datasetteurl }}">test</a>
 
 
-{% for res in resources %}
-    <div>
-        {{ res }}
-    </div>
-{% endfor %}
+    {% for res in resources %}
+        <div>
+            {{ res }}
+        </div>
+    {% endfor %}
 
-<h2>Imports</h2>
-{% for task,logging in tasks %}
-    <div>
-        {{ task.id }}
-    {{ task.in_time }}
-    {{ task.lock_time }}
-    {{ task.status }}
-    </div>
-    <pre>
+    <h2>Imports</h2>
+    <div class="accordion" id="imports">
+        {% for task,logging in tasks %}
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#task-{{ loop.index }}" aria-expanded="{% if not loop.first %}false{% else %}true{% endif %}" aria-controls="task-{{ loop.index }}">
+                        {{ task.id }}
+                        {{ task.in_time }}
+                        {{ task.lock_time }}
+                        {{ task.status }}
+                    </button>
+                </h2>
+            </div>
+            <div id="task-{{ loop.index }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#imports">
+                <div class="accordion-body">
+            <pre><code>
 {%- for timestamp, value in logging %}
     {{ timestamp }}: {{ value }}
 {%- endfor %}
-</pre>
+</code></pre>
+                </div>
+            </div>
 
-{% endfor %}
+        {% endfor %}
+    </div>
 
-Daten: {{ record.db_size|pretty_byte_size() }} ({{ record.compressed_size|pretty_byte_size() }} komprimiert)
+    Daten: {{ record.db_size|pretty_byte_size() }} ({{ record.compressed_size|pretty_byte_size() }} komprimiert)
 
-<form method="POST" action="/meta/{{ record.id }}/fetch">
-    <input type="submit" value="Import starten">
+    <form method="POST" action="/meta/{{ record.id }}/fetch">
+    <input class="btn btn-primary" type="submit" value="Import starten">
+{% endblock %}
 
-
-</body>
-</html>

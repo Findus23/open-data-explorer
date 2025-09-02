@@ -1,23 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-    <link rel="stylesheet" href="/-/static/app.css?449502">
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Dieses Datenset existiert noch nicht</h1>
+{% block main %}
 
-<div class="core">
+    <h1>Dieses Datenset existiert noch nicht</h1>
 
+    <form method="POST" action="/meta/{{ id }}/fetch">
+        <input class="btn btn-primary btn-lg" type="submit" value="Import starten">
+    </form>
 
-
-<form method="POST" action="/meta/{{ id }}/fetch">
-    <input type="submit" value="Import starten">
-
-</form>
-</div>
-
-</body>
-</html>
+{% endblock %}

@@ -17,8 +17,8 @@ class Record(BaseModel):
     publisher: str
     notes: str
     license_citation: Optional[str] = None
-    license_id: str
-    license_title: str
+    license_id: Optional[str] = None
+    license_title: Optional[str] = None
     license_url: Url
     maintainer: str
     metadata_linkage: Optional[Url]
@@ -50,8 +50,8 @@ class Resource(BaseModel):
     name: str
     url: Url
     mimetype: Optional[str]
-    position: int
-    encoding: str
+    position: Optional[int] = None
+    encoding: Optional[str] = None
     last_fetched: datetime
 
 
@@ -107,7 +107,7 @@ class MetaDatabase:
         )
 
     def get_tasks_for_record(self, record: Record) -> list[Job]:
-        conn = self.conn.execute("SELECT job_id,status,data,in_time FROM queue WHERE record= :record_id",
+        conn = self.conn.execute("SELECT job_id,status,data,in_time FROM queue WHERE record= :record_id ORDER BY in_time DESC",
                                  {"record_id": record.id})
 
         return [Job(job_id, status, record.id, json.loads(data), in_time) for job_id, status, data, in_time in conn]

@@ -1,22 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-    <link rel="stylesheet" href="/-/static/app.css?449502">
-</head>
-<body>
+{% extends "base.html" %}
 
-<h1>Home</h1>
-
-{% for rec in records %}
-    <div>
-        <h2><a href="/{{ rec.id }}">{{ rec.title }}</a> ({{ rec.num_queries }})</h2>
-    </div>
-{% endfor %}
+{% block main %}
+    {% for rec in records %}
+        <div>
+            <h2><a href="/meta/{{ rec.id }}">{{ rec.title }}</a> ({{ rec.num_queries }})</h2>
+        </div>
+    {% endfor %}
 
 
-Daten: {{ total_storage|round(1) }} MB ({{ total_storage_comp|round(1) }} MB komprimiert)
-
-</body>
-</html>
+    Daten: {{ total_storage|round(1) }} MB ({{ total_storage_comp|round(1) }} MB komprimiert)
+{% endblock %}

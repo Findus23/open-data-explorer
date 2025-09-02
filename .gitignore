@@ -5,3 +5,4 @@
 *.sqlite
 ds/*
 !ds/plugins
+node_modules/
